@@ -1,4 +1,3 @@
-
 import React, { useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { Button, Input, RTE, Select } from "..";
@@ -20,44 +19,68 @@ export default function PostForm({ post }) {
     const userData = useSelector((state) => state.auth.userData);
 
     const submit = async (data) => {
-        if (post) {
-            const file = data.image[0] ? await appwriteService.uploadFile(data.image[0]) : null;
+        try {
+            let file = null;
 
-            if (file) {
-                appwriteService.deleteFile(post.featuredImage);
+            // Upload file if provided
+            if (data.image && data.image[0]) {
+                file = await appwriteService.uploadFile(data.image[0]).catch((error) => {
+                    console.error("File upload failed:", error);
+                    return null;
+                });
             }
 
-            const dbPost = await appwriteService.updatePost(post.$id, {
-                ...data,
-                featuredImage: file ? file.$id : undefined,
-            });
+            if (post) {
+                // Update an existing post
+                if (file && post.featuredImage) {
+                    await appwriteService.deleteFile(post.featuredImage).catch((error) => {
+                        console.error("Failed to delete old file:", error);
+                    });
+                }
 
-            if (dbPost) {
-                navigate(`/post/${dbPost.$id}`);
-            }
-        } else {
-            const file = await appwriteService.uploadFile(data.image[0]);
+                const updatedPost = await appwriteService.updatePost(post.$id, {
+                    ...data,
+                    featuredImage: file ? file.$id : post.featuredImage,
+                });
 
-            if (file) {
-                const fileId = file.$id;
-                data.featuredImage = fileId;
-                const dbPost = await appwriteService.createPost({ ...data, userId: userData.$id });
+                if (updatedPost) {
+                    console.log("Post updated successfully:", updatedPost);
+                    navigate(`/post/${updatedPost.$id}`);
+                } else {
+                    console.error("Failed to update post.");
+                }
+            } else {
+                // Create a new post
+                if (file) {
+                    data.featuredImage = file.$id;
+                    const newPost = await appwriteService.createPost({
+                        ...data,
+                        userId: userData.$id,
+                    });
 
-                if (dbPost) {
-                    navigate(`/post/${dbPost.$id}`);
+                    if (newPost) {
+                        console.log("Post created successfully:", newPost);
+                        navigate(`/post/${newPost.$id}`);
+                    } else {
+                        console.error("Failed to create post.");
+                    }
+                } else {
+                    console.error("File upload failed. Cannot create post without a featured image.");
                 }
             }
+        } catch (error) {
+            console.error("An error occurred during submission:", error);
         }
     };
 
     const slugTransform = useCallback((value) => {
-        if (value && typeof value === "string")
+        if (value && typeof value === "string") {
             return value
                 .trim()
                 .toLowerCase()
                 .replace(/[^a-zA-Z\d\s]+/g, "-")
-                .replace(/\s/g, "-");
-
+                .replace(/\s+/g, "-");
+        }
         return "";
     }, []);
 
@@ -99,7 +122,7 @@ export default function PostForm({ post }) {
                     accept="image/png, image/jpg, image/jpeg, image/gif"
                     {...register("image", { required: !post })}
                 />
-                {post && (
+                {post && post.featuredImage && (
                     <div className="w-full mb-4">
                         <img
                             src={appwriteService.getFilePreview(post.featuredImage)}
