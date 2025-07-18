@@ -122,16 +122,17 @@ export class Service {
     }
 
     getFilePreview(fileId) {
-        try {
-            return this.bucket.getFilePreview(
-                conf.appwriteBucketId,
-                fileId
-            );
-        } catch (error) {
-            console.error("Appwrite service :: getFilePreview :: error", error);
-            return null; // Return null to indicate a failure
-        }
+    console.log("Fetching file preview for ID:", fileId);
+    try {
+        const url = this.bucket.getFileView(conf.appwriteBucketId, fileId); // ✅ changed from getFilePreview
+        console.log("File view URL:", url);
+        return url;
+    } catch (error) {
+        console.error("Appwrite service :: getFileView :: error", error);
+        return null;
     }
+}
+
 }
 
 const service = new Service();
