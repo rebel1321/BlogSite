@@ -1,138 +1,172 @@
 import conf from '../conf/conf.js';
-import { Client, ID, Databases, Storage, Query } from "appwrite";
 
+// Service layer for Go backend API calls (formerly Appwrite, now using Go REST API)
 export class Service {
-    client = new Client();
-    databases;
-    bucket;
-
     constructor() {
-        this.client
-            .setEndpoint(conf.appwriteUrl)
-            .setProject(conf.appwriteProjectId);
-        this.databases = new Databases(this.client);
-        this.bucket = new Storage(this.client);
+        this.apiUrl = conf.goServerUrl;
     }
 
-    async createPost({ title, slug, content, featuredImage, status, userId }) {
+    // Helper method to get auth token
+    getAuthToken() {
+        return localStorage.getItem('accessToken');
+    }
+
+    // Helper method to make authenticated requests
+    async authenticatedFetch(endpoint, options = {}) {
+        const token = this.getAuthToken();
+        const headers = {
+            ...options.headers,
+        };
+
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        // Only set Content-Type if not FormData (FormData sets its own boundary)
+        if (!(options.body instanceof FormData)) {
+            headers['Content-Type'] = 'application/json';
+        }
+
+        const response = await fetch(`${this.apiUrl}/api${endpoint}`, {
+            ...options,
+            headers,
+        });
+
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(error || `HTTP ${response.status}`);
+        }
+
+        // Always try to parse JSON for successful responses
         try {
-            const response = await this.databases.createDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteCollectionId,
-                slug,
-                { title, content, featuredImage, status, userId }
-            );
-            console.log("Document created successfully:", response);
+            const data = await response.json();
+            return data;
+        } catch (e) {
+            // If not JSON, return the response object
             return response;
-        } catch (error) {
-            console.error("Appwrite service :: createPost :: error", error);
-            throw error; // Ensure the error is handled by the calling function
         }
     }
 
-    async updatePost(slug, { title, content, featuredImage, status }) {
+    // ================= CREATE POST =================
+    async createPost({ title, slug, content, status, userId, image }) {
         try {
-            const response = await this.databases.updateDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteCollectionId,
-                slug,
-                { title, content, featuredImage, status }
-            );
-            console.log("Document updated successfully:", response);
+            const formData = new FormData();
+            formData.append('title', title);
+            formData.append('slug', slug);
+            formData.append('content', content);
+            formData.append('status', status);
+
+            // Append image file if provided
+            if (image && image[0]) {
+                formData.append('image', image[0]);
+            } else if (image instanceof File) {
+                formData.append('image', image);
+            }
+
+            const response = await this.authenticatedFetch('/posts', {
+                method: 'POST',
+                body: formData,
+                // Don't set Content-Type header; browser will set it with boundary
+                headers: {},
+            });
+
             return response;
         } catch (error) {
-            console.error("Appwrite service :: updatePost :: error", error);
+            console.error("Service :: createPost :: error", error);
             throw error;
         }
     }
 
+    // ================= UPDATE POST =================
+    async updatePost(slug, { title, content, status, image }) {
+        try {
+            const formData = new FormData();
+            
+            if (title) formData.append('title', title);
+            if (content) formData.append('content', content);
+            if (status) formData.append('status', status);
+
+            // Append image file if provided
+            if (image && image[0]) {
+                formData.append('image', image[0]);
+            } else if (image instanceof File) {
+                formData.append('image', image);
+            }
+
+            const response = await this.authenticatedFetch(`/posts/${slug}`, {
+                method: 'PUT',
+                body: formData,
+                // Don't set Content-Type header; browser will set it with boundary
+                headers: {},
+            });
+
+            return response;
+        } catch (error) {
+            console.error("Service :: updatePost :: error", error);
+            throw error;
+        }
+    }
+
+    // ================= DELETE POST =================
     async deletePost(slug) {
         try {
-            await this.databases.deleteDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteCollectionId,
-                slug
-            );
-            console.log("Document deleted successfully:", slug);
+            const response = await this.authenticatedFetch(`/posts/${slug}`, {
+                method: 'DELETE',
+            });
+
             return true;
         } catch (error) {
-            console.error("Appwrite service :: deletePost :: error", error);
+            console.error("Service :: deletePost :: error", error);
             return false;
         }
     }
 
+    // ================= GET SINGLE POST =================
     async getPost(slug) {
         try {
-            const response = await this.databases.getDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteCollectionId,
-                slug
-            );
-            console.log("Fetched post successfully:", response);
+            const response = await this.authenticatedFetch(`/posts/${slug}`, {
+                method: 'GET',
+            });
+
             return response;
         } catch (error) {
-            console.error("Appwrite service :: getPost :: error", error);
+            console.error("Service :: getPost :: error", error);
             throw error;
         }
     }
 
-    async getPosts(queries = [Query.equal("status", "active")]) {
+    // ================= GET ALL POSTS =================
+    async getPosts(queries = []) {
         try {
-            const response = await this.databases.listDocuments(
-                conf.appwriteDatabaseId,
-                conf.appwriteCollectionId,
-                queries
-            );
-            console.log("Fetched posts successfully:", response);
-            return response;
+            // Go backend returns array of posts directly
+            const response = await this.authenticatedFetch('/posts', {
+                method: 'GET',
+            });
+
+            
+            // Ensure we always return an array
+            if (Array.isArray(response)) {
+                return response;
+            } else if (response && response.documents) {
+                return response.documents;
+            }
+            return [];
         } catch (error) {
-            console.error("Appwrite service :: getPosts :: error", error);
-            return { success: false, error };
+            console.error("Service :: getPosts :: error", error);
+            return [];
         }
     }
 
-    // File upload service
-    async uploadFile(file) {
-        try {
-            const response = await this.bucket.createFile(
-                conf.appwriteBucketId,
-                ID.unique(),
-                file
-            );
-            console.log("File uploaded successfully:", response);
-            return response;
-        } catch (error) {
-            console.error("Appwrite service :: uploadFile :: error", error);
-            throw error; // Ensure errors are handled in the calling function
+    // ================= GET FILE PREVIEW =================
+    getFilePreview(imageUrl) {
+        if (!imageUrl) return null;
+        // If it's already a full URL (http/https), return as is
+        if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+            return imageUrl;
         }
+        // Otherwise prepend the server URL
+        return `${this.apiUrl}${imageUrl}`;
     }
-
-    async deleteFile(fileId) {
-        try {
-            await this.bucket.deleteFile(
-                conf.appwriteBucketId,
-                fileId
-            );
-            console.log("File deleted successfully:", fileId);
-            return true;
-        } catch (error) {
-            console.error("Appwrite service :: deleteFile :: error", error);
-            return false;
-        }
-    }
-
-    getFilePreview(fileId) {
-    console.log("Fetching file preview for ID:", fileId);
-    try {
-        const url = this.bucket.getFileView(conf.appwriteBucketId, fileId); // ✅ changed from getFilePreview
-        console.log("File view URL:", url);
-        return url;
-    } catch (error) {
-        console.error("Appwrite service :: getFileView :: error", error);
-        return null;
-    }
-}
-
 }
 
 const service = new Service();

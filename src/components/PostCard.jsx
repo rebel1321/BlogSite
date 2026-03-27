@@ -2,17 +2,17 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 import appwriteService from '../appwrite/config'
 
-function PostCard({ $id, title, featuredImage }) {
-    // Get the direct view URL for the image (no transformations)
-    const imageUrl = appwriteService.getFilePreview(featuredImage)
+function PostCard({ slug, title, imageUrl }) {
+    // Get the direct view URL for the image
+    const imagePreviewUrl = appwriteService.getFilePreview(imageUrl)
 
     return (
-        <Link to={`/post/${$id}`}>
+        <Link to={`/post/${slug}`}>
             <div className="w-full bg-gray-100 rounded-xl p-4 hover:shadow-lg transition">
                 <div className="w-full mb-4">
-                    {imageUrl ? (
+                    {imagePreviewUrl ? (
                         <img
-                            src={imageUrl}
+                            src={imagePreviewUrl}
                             alt={title}
                             className="rounded-xl w-full max-h-60 object-cover"
                         />
