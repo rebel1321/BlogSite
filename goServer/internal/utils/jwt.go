@@ -11,10 +11,10 @@ var refreshSecret = []byte("refresh_secret")
 
 func GenerateTokens(email string) (string, string, error) {
 
-	// Access Token (1 day)
+	// Access Token (15 minutes)
 	accessClaims := jwt.MapClaims{
 		"email": email,
-		"exp":   time.Now().Add(time.Hour * 24).Unix(),
+		"exp":   time.Now().Add(time.Minute * 15).Unix(),
 	}
 
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
