@@ -16,6 +16,9 @@ func SetupRoutes() *mux.Router {
 	router.Use(middleware.Cors)
 	// router.Use(middleware.Logger)
 
+	// Root endpoint
+	router.HandleFunc("/", rootHandler).Methods("GET", "OPTIONS")
+
 	// Health check (no prefix)
 	router.HandleFunc("/health", healthCheckHandler).Methods("GET", "OPTIONS")
 
@@ -30,6 +33,12 @@ func SetupRoutes() *mux.Router {
 	RegisterPostRoutes(api)
 
 	return router
+}
+
+func rootHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"message": "🚀 MegaBlog API Server", "status": "running", "endpoints": {"/health": "Server health check", "/api/users": "User management", "/api/posts": "Blog posts"}}`))
 }
 
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
