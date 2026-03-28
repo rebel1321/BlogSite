@@ -89,40 +89,38 @@ export class AuthService {
     }
 
     async getCurrentUser() {
-        try {
-            const accessToken = this.getAccessToken();
-            const headers = {
+    try {
+        const accessToken = this.getAccessToken();
+
+        // ✅ ADD THIS BLOCK (MOST IMPORTANT FIX)
+        if (!accessToken) {
+            return null; // 🚫 Don't even call API
+        }
+
+        const response = await fetch(`${this.apiUrl}/api/me`, {
+            method: 'GET',
+            headers: {
                 'Content-Type': 'application/json',
-            };
+                Authorization: `Bearer ${accessToken}`,
+            },
+        });
 
-            if (accessToken) {
-                headers['Authorization'] = `Bearer ${accessToken}`;
-            }
-
-            const response = await fetch(`${this.apiUrl}/api/me`, {
-                method: 'GET',
-                headers,
-            });
-
-            // Handle 401 silently - user not logged in
-            if (response.status === 401) {
-                this.clearTokens();
-                return null;
-            }
-
-            if (!response.ok) {
-                this.clearTokens();
-                return null;
-            }
-
-            const user = await response.json();
-            return user;
-        } catch (error) {
-            // Network error or parsing error - silently fail
+        if (response.status === 401) {
             this.clearTokens();
             return null;
         }
+
+        if (!response.ok) {
+            this.clearTokens();
+            return null;
+        }
+
+        return await response.json();
+    } catch (error) {
+        this.clearTokens();
+        return null;
     }
+}
 
     async logout() {
         try {
