@@ -90,13 +90,35 @@ export class AuthService {
 
     async getCurrentUser() {
         try {
-            const user = await this.apiCall('/me', {
+            const accessToken = this.getAccessToken();
+            const headers = {
+                'Content-Type': 'application/json',
+            };
+
+            if (accessToken) {
+                headers['Authorization'] = `Bearer ${accessToken}`;
+            }
+
+            const response = await fetch(`${this.apiUrl}/api/me`, {
                 method: 'GET',
+                headers,
             });
+
+            // Handle 401 silently - user not logged in
+            if (response.status === 401) {
+                this.clearTokens();
+                return null;
+            }
+
+            if (!response.ok) {
+                this.clearTokens();
+                return null;
+            }
+
+            const user = await response.json();
             return user;
         } catch (error) {
-            // Silent fail - 401 is expected when user is not logged in
-            // No console logging for this expected error
+            // Network error or parsing error - silently fail
             this.clearTokens();
             return null;
         }
