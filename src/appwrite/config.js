@@ -152,7 +152,10 @@ export class Service {
             }
             return [];
         } catch (error) {
-            console.error("Service :: getPosts :: error", error);
+            // Don't log 401 errors - they're expected when user isn't logged in
+            if (!error.message.includes('401')) {
+                console.error("Service :: getPosts :: error", error);
+            }
             return [];
         }
     }
