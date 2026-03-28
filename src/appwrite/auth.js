@@ -96,6 +96,7 @@ export class AuthService {
             return user;
         } catch (error) {
             // Silent fail - 401 is expected when user is not logged in
+            // No console logging for this expected error
             this.clearTokens();
             return null;
         }

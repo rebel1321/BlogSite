@@ -5,9 +5,11 @@ import { Link } from 'react-router-dom';
 
 function Home() {
   const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    setLoading(true);
     appwriteService.getPosts()
       .then((posts) => {
         // getPosts always returns an array
@@ -16,8 +18,25 @@ function Home() {
       .catch((err) => {
         console.error('Error fetching posts:', err);
         setError('Failed to fetch posts. Please try again later.');
+      })
+      .finally(() => {
+        setLoading(false);
       });
   }, []);
+
+  if (loading) {
+    return (
+      <div className="w-full py-8 mt-4 text-center">
+        <Container>
+          <div className="flex flex-wrap">
+            <div className="p-2 w-full">
+              <h1 className="text-2xl font-bold text-gray-500">Loading posts...</h1>
+            </div>
+          </div>
+        </Container>
+      </div>
+    );
+  }
 
   if (error) {
     return (
