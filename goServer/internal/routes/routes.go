@@ -3,6 +3,7 @@ package routes
 import (
 	"net/http"
 	"os"
+	"strings"
 
 	"goServer/internal/middleware"
 
@@ -49,11 +50,32 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 
 // Handle OPTIONS preflight requests for CORS
 func handleOptions(w http.ResponseWriter, r *http.Request) {
-	frontendURL := os.Getenv("FRONTEND_URL")
-	if frontendURL == "" {
-		frontendURL = "http://localhost:5173"
+	// Get allowed origins from environment variable (comma-separated)
+	allowedOriginsStr := os.Getenv("ALLOWED_ORIGINS")
+	if allowedOriginsStr == "" {
+		allowedOriginsStr = "http://localhost:5173"
 	}
-	w.Header().Set("Access-Control-Allow-Origin", frontendURL)
+
+	// Parse comma-separated origins
+	allowedOrigins := strings.Split(allowedOriginsStr, ",")
+
+	// Get the requesting origin
+	origin := r.Header.Get("Origin")
+
+	// Check if origin is allowed
+	isAllowed := false
+	for _, allowed := range allowedOrigins {
+		if strings.TrimSpace(allowed) == origin {
+			isAllowed = true
+			break
+		}
+	}
+
+	// Set CORS headers if origin is allowed
+	if isAllowed {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+	}
+
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 	w.Header().Set("Access-Control-Allow-Credentials", "true")
