@@ -14,10 +14,10 @@ import (
 )
 
 func Start() {
-	// Load environment variables
+	// Load environment variables (optional - in production, env vars are set by platform)
 	err := godotenv.Load("config/.env")
 	if err != nil {
-		log.Fatal("❌ Error loading .env file")
+		log.Println("⚠️  No .env file found - using platform environment variables")
 	}
 
 	// Connect to database
