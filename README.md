@@ -1,18 +1,21 @@
 # 📝 12MegaBlog - Full Stack Blog Application
 
-A modern, full-stack blogging platform built with React and Go, featuring user authentication, post management with rich text editing, and image uploads to Cloudinary.
+A modern, full-stack blogging platform built with **React** frontend and **Go** backend, featuring JWT-based authentication, rich text editing with TinyMCE, and image uploads via Cloudinary.
 
 ---
 
 ## 🎯 Project Overview
 
 **12MegaBlog** is a complete blog application where users can:
+- Register and authenticate with secure JWT tokens
 - Create, read, update, and delete blog posts
 - Upload featured images via Cloudinary
-- Write rich content using TinyMCE editor
-- Manage their own posts (My Posts page)
-- Browse all published posts from other users (Home page)
-- Secure authentication with JWT tokens
+- Write rich, formatted content using TinyMCE editor
+- Manage their own posts in a dedicated dashboard
+- Browse and view all published posts from the community
+- Automatic token refresh for seamless sessions
+
+**Migration Note:** Recently migrated from Appwrite to a custom Go backend for greater control, flexibility, and performance.
 
 ---
 
@@ -31,17 +34,48 @@ A modern, full-stack blogging platform built with React and Go, featuring user a
 - **Go 1.x** - Server language
 - **Gorilla Mux** - HTTP router
 - **MongoDB** - NoSQL database
-- **JWT** - Authentication
-- **Cloudinary SDK** - Image storage
+- **JWT** - Token-based authentication
+- **Cloudinary SDK** - Image storage and processing
+- **BCrypt** - Password hashing
+
+### **Database & Services**
+- **MongoDB** - Document database for users and posts
+- **Cloudinary** - Cloud-based image storage and optimization
+- **JWT (JSON Web Tokens)** - Stateless, token-based authentication
 
 ### **DevOps & Tools**
 - **Git** - Version control
 - **npm** - Package manager (frontend)
 - **Go Modules** - Package manager (backend)
+- **Vite** - Fast frontend build tool
 
 ---
 
-## 📁 Project Structure
+## � Migration from Appwrite to Go Backend
+
+This project was **originally built with Appwrite** but has been **migrated to a custom Go backend** for the following reasons:
+
+| Aspect | Appwrite | Go Backend |
+|--------|----------|-----------|
+| **Architecture** | Backend-as-a-Service (BaaS) | Self-hosted REST API |
+| **Control** | Limited customization | Full control over implementation |
+| **Database** | Integrated database | Flexible MongoDB integration |
+| **Authentication** | Appwrite Auth SDK | Custom JWT implementation |
+| **File Storage** | Appwrite Storage | Cloudinary integration |
+| **Performance** | Managed service | Optimized custom code |
+| **Cost** | Subscription-based | Server hosting costs |
+| **Scalability** | Automatic | Manual but flexible |
+
+### **What Changed:**
+- **Frontend API Layer:** The `src/appwrite/` folder now contains REST client utilities instead of Appwrite SDK calls
+- **Backend:** Custom Go REST API with JWT tokens and MongoDB
+- **Database:** MongoDB replaces Appwrite's database
+- **Authentication:** JWT tokens (access + refresh) instead of Appwrite Auth sessions
+- **Compatibility:** Frontend code remains largely unchanged; only the API service layer was updated
+
+---
+
+## �📁 Project Structure
 
 ```
 12MegaBlog/
@@ -76,10 +110,9 @@ A modern, full-stack blogging platform built with React and Go, featuring user a
 │   ├── 📂 store/                    # Redux state management
 │   │   ├── store.js                 # Redux store
 │   │   └── authSlice.js             # Auth state slice
-│   ├── 📂 appwrite/                 # API service layer
-│   │   ├── auth.js                  # Authentication API
-│   │   ├── config.js                # Post/Blog API
-│   │   └── README.md                # API documentation
+   ├── 📂 appwrite/                 # Go API Service Layer (REST Client)
+   │   ├── auth.js                  # Authentication API calls (register, login, logout)
+   │   └── config.js                # Post API calls (CRUD operations)
 │   ├── 📂 conf/                     # Configuration
 │   │   └── conf.js                  # Environment config
 │   ├── 📂 utils/                    # Utility functions
@@ -193,6 +226,35 @@ App (Root)
 - ✅ React Hook Form for form management
 - ✅ TinyMCE for rich text editing
 - ✅ Responsive design with Tailwind CSS
+
+---
+
+## 🔌 Frontend API Service Layer
+
+The `src/appwrite/` folder contains the REST API client that communicates with the Go backend:
+
+### **AuthService** (`src/appwrite/auth.js`)
+Handles all authentication operations:
+- `createAccount(email, password, name)` - Register new user
+- `login(email, password)` - Authenticate user
+- `logout()` - Clear tokens and logout
+- `getCurrentUser()` - Get current authenticated user
+- `apiCall(endpoint, options)` - Helper method for authenticated API calls
+
+### **Service** (`src/appwrite/config.js`)
+Handles all post/blog operations:
+- `createPost(title, slug, content, status, image)` - Create post
+- `getPosts()` - Get all active posts
+- `getPost(slug)` - Get single post
+- `updatePost(slug, title, content, status, image)` - Update post
+- `deletePost(slug)` - Delete post
+- `authenticatedFetch(endpoint, options)` - Helper for authenticated requests
+
+### **Token Management**
+- Tokens stored in `localStorage`
+- Access Token: 15-minute expiry (short-lived)
+- Refresh Token: 7-day expiry (long-lived)
+- Every API request auto-adds `Authorization: Bearer {accessToken}` header
 
 ---
 
@@ -462,14 +524,18 @@ Response (200):
 VITE_GO_SERVER_URL=http://localhost:8080
 ```
 
-#### **Backend (config/.env)**
+#### **Backend (goServer/config/.env)**
 ```env
 PORT=8080
 MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/12megablog
 CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
+JWT_ACCESS_SECRET=your_strong_access_secret_here
+JWT_REFRESH_SECRET=your_strong_refresh_secret_here
 ```
+
+⚠️ **Security Note:** The JWT secrets in `goServer/internal/utils/jwt.go` and `goServer/internal/middleware/auth.go` are currently hardcoded. For production, update these files to read from environment variables (`os.Getenv("JWT_ACCESS_SECRET")` and `os.Getenv("JWT_REFRESH_SECRET")`).
 
 ### **Installation Steps**
 
@@ -752,6 +818,69 @@ const authSlice = createSlice({
   }
 })
 ```
+
+---
+
+## 💡 Best Practices
+
+### **Frontend**
+- Always check `getCurrentUser()` before accessing protected routes
+- Store tokens in localStorage; never expose them in code
+- Use Redux for auth state to avoid prop drilling
+- Validate form inputs before sending to API
+- Handle errors gracefully with user-friendly messages
+- Use React.lazy() for code splitting on large routes
+
+### **Backend**
+- ✅ Validate all input data before processing
+- ✅ Use prepared MongoDB queries to prevent injection
+- ✅ Add rate limiting to prevent brute force attacks
+- ✅ Log all sensitive operations (login, post deletion)
+- ✅ Use HTTPS in production
+- ✅ Regularly rotate JWT secrets
+- ✅ Implement request timeouts to prevent hanging requests
+- ⚠️ **TODO:** Move JWT secrets from hardcoded values to environment variables
+
+### **General**
+- Keep `.env` files out of version control
+- Test API endpoints before frontend integration
+- Document any new endpoints in README
+- Use meaningful commit messages
+- Keep dependencies updated for security patches
+
+---
+
+## 🔄 Migration Guide for Appwrite Users
+
+If you're migrating from Appwrite:
+
+### **What Changed**
+| Feature | Appwrite | Go Backend |
+|---------|----------|-----------|
+| User Registration | `account.create()` | `POST /api/register` |
+| Authentication | Session-based | JWT-based (access + refresh) |
+| Post Storage | Appwrite Database | MongoDB |
+| File Upload | Appwrite Storage | Cloudinary |
+| Client Library | Appwrite SDK | Vanilla fetch API |
+
+### **Frontend Changes**
+1. **Old (Appwrite SDK)**
+   ```javascript
+   import { Client, Account, Databases } from "appwrite";
+   const client = new Client(); // Initialize Appwrite
+   ```
+
+2. **New (Go REST API)**
+   ```javascript
+   import { AuthService } from './appwrite/auth';
+   const authService = new AuthService(); // REST client
+   ```
+
+### **Code Migration**
+- Replace `account.create()` with `AuthService.createAccount()`
+- Replace `databases.createDocument()` with `Service.createPost()`
+- Replace session handling with localStorage JWT tokens
+- Update error handling to work with HTTP status codes instead of SDK exceptions
 
 ---
 
